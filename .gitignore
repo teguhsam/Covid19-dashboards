@@ -1,0 +1,5 @@
+
+.DS_Store
+*.pyc
+.ipynb_checkpoints/Notebook-checkpoint.ipynb
+.vscode/launch.json
