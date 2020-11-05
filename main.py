@@ -2,7 +2,7 @@ import os
 from os import path
 from datetime import date
 from import_dataset import download_json, split_json_to_dfs
-from other_functions import millify
+from other_functions import millify, clean_directory, find_suffix_filenames
 
 # ----------------------------------------------------------------------------
 # Dash
@@ -13,6 +13,10 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+
+# ----------------------------------------------------------------------------
+# Chart Studio
+import chart_studio
 
 # ----------------------------------------------------------------------------
 # Structure
@@ -27,13 +31,19 @@ create_directory('Datasets')
 # ----------------------------------------------------------------------------
 # Check for the most current file
 today = date.today()
-current_filename = 'Datasets/covid_{}.json'.format(today)
+todays_file = 'covid_{}.json'.format(today)
+current_filename = 'Datasets/' + todays_file
 
+# Check if the most current file exist
 if os.path.isfile(current_filename) == True:
     print('The most current file alread exists. No new file was downloaded')
 else:
     download_json()
 
+# Check all files that has .josn extension
+check_files = find_suffix_filenames('Datasets/', '.json')
+# Clean (remove) older.json file while keeping the most recent one. 
+clean_directory(check_files, exclude=[todays_file])
 
 country_information, country_key, combined_df = split_json_to_dfs(current_filename)
 
@@ -50,7 +60,7 @@ combined_df = combined_df[col_reorder]
 # DropDown
 drop_option = country_key.copy()
 drop_option['value'] = drop_option['location']
-drop_option = drop_option.drop('index', 1)
+drop_option = drop_option.drop(['index','continent'], 1)
 drop_option = drop_option.rename(columns = {'location': 'label', 'value': 'value'})
 drop_option_list = drop_option.to_dict(orient='records')
 
@@ -76,16 +86,16 @@ app.layout = html.Div([
     ),
     
     html.Br(),
+    ################# Datacard
+    dcc.Graph(id = 'datacard', figure={}),
+
+
     ################# Graph
     html.Div(children=[
         dcc.Graph(id = 'total_cases', style={'display': 'inline-block'}),
         dcc.Graph(id = 'cases', style={'display': 'inline-block'}),
         dcc.Graph(id = 'deaths', style={'display': 'inline-block'})
-    ]),
-
-    dcc.Graph(id = 'datacard', figure={}),
-
-    html.Div(id = 'population_container', children = [])
+    ])
 ])
 
 # ----------------------------------------------------------------------------
@@ -138,31 +148,42 @@ def update_graph(option_select):
     return fig, container, fig2, fig3
 
 @app.callback(
-    [Output(component_id = 'population_container', component_property='children'),
-    Output(component_id='datacard', component_property='figure')],
+    Output(component_id='datacard', component_property='figure'),
     [Input(component_id='select_country', component_property= 'value')])
 def stat_narrative(option_select):
     df2 = country_information.copy()
     df2 = df2[df2['location'] == option_select]
     country_stat_dict = df2.to_dict('records')[0]
 
-    container = ["{} has a population of {} with the median age of {} years old and a life expectancy of {} years old".format(option_select, 
-    millify(country_stat_dict['population']), 
-    country_stat_dict['median_age'],
-    country_stat_dict['life_expectancy']
-    )]
-
-    fig = go.Figure(go.Indicator(mode = "delta",
-    value = 400,
-    number = {'prefix': "$"},
-    delta = {'position': "top", 'reference': 320},
-    domain = {'x': [0, 1], 'y': [0, 1]}))
-
-    go.Indicator()
-
-
-    return container, fig
-
+    # Data Card
+    fig = go.Figure()
+    fig.add_trace(
+        go.Indicator(mode = "number",
+        value = country_stat_dict['population'],
+        #delta = {'position': "top", 'reference': 320},
+        domain = {'row': 0, 'column': 0},
+        title = {'text': 'Population'}
+        ))
+    fig.add_trace(
+        go.Indicator(mode = "number",
+        value = country_stat_dict['median_age'],
+        #delta = {'position': "top", 'reference': 320},
+        domain = {'row': 0, 'column': 1},
+        title = {'text': 'Median Age'}
+        ))
+    fig.add_trace(
+        go.Indicator(mode = "number",
+        value = country_stat_dict['life_expectancy'],
+        #delta = {'position': "top", 'reference': 320},
+        domain = {'row': 0, 'column': 2},
+        title = {'text': 'Life Expectancy'}
+        ))
+    fig.update_layout(
+        grid = {'rows': 1, 'columns': 3, 'pattern': "independent"},
+        width = 800,
+        height = 200)
+    
+    return fig
 
 # ----------------------------------------------------------------------------
 # Connect Plotly app with Dash Component

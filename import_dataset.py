@@ -39,7 +39,7 @@ def split_json_to_dfs(filename):
     ### Dataframe #1
     country_information = read_df.T.drop('data', 1).reset_index()
     ### Dataframe #2
-    country_key = country_information[['index', 'location']]
+    country_key = country_information[['index', 'location', 'continent']]
     ### Datafrane #3
     covid_cases = read_df.T['data']
     combined_df = pd.DataFrame()
